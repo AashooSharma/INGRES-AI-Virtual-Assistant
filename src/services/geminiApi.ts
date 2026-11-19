@@ -33,19 +33,17 @@ export class GeminiApiService {
   private currentKeyIndex: number = 0;
   private disabledKeys: Set<string> = new Set();
   
-  /* 
-  /* 
-   * VALIDATED: Reverting to gemini-2.0-flash-exp as per user request.
-   * Note: This model may hit 429 Quota Exceeded more frequently than 1.5-flash.
-   */
   private primaryModel =
-    (import.meta.env.VITE_GEMINI_MODEL as string) || "gemini-2.0-flash-exp";
+    (typeof window !== "undefined" ? localStorage.getItem("USER_GEMINI_MODEL") : null) ||
+    (import.meta.env.VITE_GEMINI_MODEL as string) ||
+    "gemini-2.5-flash";
     
-  // Fallback order (verified available models)
+  // Fallback order (verified available models in Google AI Studio)
   private fallbackModels = [
-    "gemini-2.0-flash",       // Stable 2.0 Flash
-    "gemini-1.5-flash",       // High stability fallback
-    "gemini-pro",             // Legacy Pro
+    "gemini-2.5-flash",
+    "gemini-1.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-pro",
   ];
   private triedModels = new Set<string>();
 

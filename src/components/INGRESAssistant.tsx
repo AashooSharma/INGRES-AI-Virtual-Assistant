@@ -52,7 +52,9 @@ import {
   BrainCircuit,
   VolumeX,
   Volume2,
+  Settings,
 } from "lucide-react";
+import { SettingsDialog } from "./SettingsDialog";
 import { GroundwaterComparisonChart } from "./GroundWaterComponent";
 import AIResponseRenderer from "./ai-components/AIResponseRenderer";
 import AIResponseRendererV2 from "./ai-components/AIResponseRendererV2";
@@ -1217,8 +1219,19 @@ export const INGRESAssistant = ({
   const [isListeningForFollowUp, setIsListeningForFollowUp] = useState(false);
   const [showListeningIndicator, setShowListeningIndicator] = useState(false);
   const [isMapAnalysisOpen, setIsMapAnalysisOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [userApiKey, setUserApiKey] = useState(() => {
+    return (
+      (typeof window !== "undefined"
+        ? localStorage.getItem("USER_GEMINI_API_KEY")
+        : "") ||
+      import.meta.env.VITE_GEMINI_API_KEY ||
+      ""
+    );
+  });
 
   const apiKeys = [
+    userApiKey,
     import.meta.env.VITE_GEMINI_API_KEY || "",
     import.meta.env.VITE_GEMINI_API_KEY_2 || "",
     import.meta.env.VITE_GEMINI_API_KEY_3 || "",
@@ -1227,13 +1240,31 @@ export const INGRESAssistant = ({
   // Persistent GeminiApiService instance to retain conversation history across messages
   const geminiServiceRef = useRef<GeminiApiService | null>(null);
   
-  // Initialize GeminiApiService once when apiKeys are available
+  // Initialize GeminiApiService when apiKeys change
   useEffect(() => {
-    if (apiKeys.length > 0 && !geminiServiceRef.current) {
+    if (apiKeys.length > 0) {
       geminiServiceRef.current = new GeminiApiService(apiKeys);
       console.log("[GEMINI] Service initialized with key rotation support");
     }
-  }, [apiKeys.length]);
+  }, [userApiKey, apiKeys.length]);
+
+  const handleSettingsSaved = () => {
+    const savedKey = localStorage.getItem("USER_GEMINI_API_KEY") || "";
+    setUserApiKey(savedKey);
+    const activeKeys = [
+      savedKey,
+      import.meta.env.VITE_GEMINI_API_KEY || "",
+      import.meta.env.VITE_GEMINI_API_KEY_2 || "",
+    ].filter(Boolean);
+    if (activeKeys.length > 0) {
+      geminiServiceRef.current = new GeminiApiService(activeKeys);
+    }
+    setToast({
+      message: savedKey ? "Google AI Studio API Key & Model updated!" : "Settings saved (Offline RAG / Ollama active)",
+      type: "info",
+      visible: true,
+    });
+  };
   
   const {
     text: voiceText,
@@ -2433,8 +2464,16 @@ Your response should sound like it's coming from a knowledgeable human analyst e
         }`}
       >
         {!embedded && (
-          <div className="absolute top-8 right-8">
-            {/* <NotificationBell /> */}
+          <div className="absolute top-8 right-8 flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsSettingsOpen(true)}
+              className="bg-white/20 hover:bg-white/30 text-white border-white/40 backdrop-blur-md text-xs font-medium rounded-full shadow-sm"
+            >
+              <Settings className="w-3.5 h-3.5 mr-1.5" />
+              AI Settings
+            </Button>
           </div>
         )}
       <div className="relative text-center max-w-4xl mx-auto">
@@ -2546,7 +2585,6 @@ Your response should sound like it's coming from a knowledgeable human analyst e
           }`}
         >
           <div className="flex items-center gap-2">
-            {/* {!embedded && <NotificationBell />} */}
             <Button
               variant="ghost"
               onClick={() => {
@@ -2555,6 +2593,14 @@ Your response should sound like it's coming from a knowledgeable human analyst e
               }}
             >
               <X className="h-4 w-4 mr-2" /> End Chat
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsSettingsOpen(true)}
+              className="h-8 text-xs font-medium rounded-full border-slate-300 dark:border-slate-700"
+            >
+              <Settings className="w-3.5 h-3.5 mr-1" /> AI Settings
             </Button>
           </div>
           <div className="flex items-center gap-2 text-xs text-slate-700 bg-white/90 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-slate-200 shadow-sm">
@@ -2791,6 +2837,13 @@ Your response should sound like it's coming from a knowledgeable human analyst e
         isOpen={isMapAnalysisOpen}
         onClose={() => setIsMapAnalysisOpen(false)}
         onImageAnalysis={handleImageAnalysis}
+      />
+
+      {/* AI Assistant & Google AI Studio Settings Dialog */}
+      <SettingsDialog
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        onSettingsSaved={handleSettingsSaved}
       />
     </div>
   );
