@@ -1,0 +1,49 @@
+name: 🚀 Build and Prepare for Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v3
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: 🔧 Install dependencies
+        run: npm ci
+
+      - name: 🏗️ Build project
+        run: npm run build
+
+      - name: 🧪 Lint code
+        run: npm run lint
+
+      - name: 📝 Create build summary
+        run: |
+          echo "## 🎉 Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Dependencies installed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Build completed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Code linting passed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Ready for Vercel deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 To deploy:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Connect this repo to Vercel" >> $GITHUB_STEP_SUMMARY
+          echo "2. Set VITE_GEMINI_API_KEY environment variable" >> $GITHUB_STEP_SUMMARY
+          echo "3. Deploy automatically!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎭 Features included:" >> $GITHUB_STEP_SUMMARY
+          echo "- Playwright automation (with simulation fallback)" >> $GITHUB_STEP_SUMMARY
+          echo "- AI-powered groundwater analysis" >> $GITHUB_STEP_SUMMARY
+          echo "- Enhanced visual charts" >> $GITHUB_STEP_SUMMARY
+          echo "- Serverless API functions" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,137 @@
+services:
+  # PostgreSQL Database with pgvector for RAG support
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ground-sense-postgres
+    environment:
+      POSTGRES_DB: ground_sense_bot
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - ground-sense-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d ground_sense_bot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Ollama - Local LLM for SQL generation (cost-free alternative to Gemini)
+  # COMMENTED OUT: Using system Ollama running on host at localhost:11434
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: ground-sense-ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   networks:
+  #     - ground-sense-network
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #   # Uncomment below for GPU support
+  #   # deploy:
+  #   #   resources:
+  #     reservations:
+  #       devices:
+  #         - driver: nvidia
+  #           count: 1
+  #           capabilities: [gpu]
+
+  # Redis - Permanent Caching with Persistence (survives restarts!)
+  redis:
+    image: redis:7-alpine
+    container_name: ground-sense-redis
+    command: redis-server --appendonly yes --appendfsync everysec --save 60 1
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ground-sense-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  # Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ground-sense-app
+    env_file:
+      - .env
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=admin
+      - DB_PASSWORD=admin
+      - DB_NAME=ground_sense_bot
+      - DB_SSLMODE=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - OLLAMA_ENABLED=true
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - OLLAMA_MODEL=sqlcoder:7b
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/app/uploads
+    networks:
+      - ground-sense-network
+    restart: unless-stopped
+
+  # Data Ingestion Service (Run once to populate embeddings)
+  # Uncomment to run ingestion, then comment out again
+  # ingestion:
+  #   image: python:3.11-slim
+  #   container_name: ground-sense-ingestion
+  #   working_dir: /app
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     - DB_HOST=postgres
+  #     - DB_PORT=5432
+  #     - DB_NAME=ground_sense_bot
+  #     - DB_USER=admin
+  #     - DB_PASSWORD=admin
+  #   volumes:
+  #     - ../Data:/app
+  #   command: >
+  #     sh -c "
+  #       pip install -q google-generativeai psycopg2-binary tqdm python-dotenv &&
+  #       python ingest_rag_data.py --db-host postgres --db-port 5432
+  #     "
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   networks:
+  #     - ground-sense-network
+  #   profiles:
+  #     - ingestion
+
+volumes:
+  postgres_data:
+  redis_data:
+  ollama_data:
+
+networks:
+  ground-sense-network:
+    driver: bridge
